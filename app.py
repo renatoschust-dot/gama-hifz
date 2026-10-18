@@ -10,6 +10,81 @@ import os, sys, json, re, sqlite3, time, base64, tempfile, threading, subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
+
+# ============================ TTS MOTORI (besplatno/uz trial) ============================
+# Redoslijed: cloud (Google Cloud TTS, najprirodniji) -> gemini (Gemini TTS) -> edge (besplatno)
+CLOUD_TTS_KEY   = os.environ.get("CLOUD_TTS_KEY", "").strip()
+CLOUD_TTS_VOICE = os.environ.get("CLOUD_TTS_VOICE", "hr-HR-Chirp3-HD-Charon")
+GEMINI_TTS_KEY  = os.environ.get("GEMINI_TTS_KEY", "").strip()
+GEMINI_TTS_MODEL= os.environ.get("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts")
+EDGE_VOICE      = os.environ.get("HIFZ_TTS_VOICE", "bs-BA-GoranNeural")
+TTS_ENGINE      = os.environ.get("HIFZ_TTS_ENGINE", "auto")   # auto|cloud|gemini|edge
+
+
+def tts_cloud(txt, out):
+    """Google Cloud Text-to-Speech (MP3). Trazi CLOUD_TTS_KEY (GCP, texttospeech API)."""
+    if not CLOUD_TTS_KEY:
+        raise RuntimeError("nema CLOUD_TTS_KEY")
+    import urllib.request
+    lang = "-".join(CLOUD_TTS_VOICE.split("-")[:2])
+    body = {"input": {"text": txt},
+            "voice": {"languageCode": lang, "name": CLOUD_TTS_VOICE},
+            "audioConfig": {"audioEncoding": "MP3", "speakingRate": 0.95}}
+    req = urllib.request.Request(
+        "https://texttospeech.googleapis.com/v1/text:synthesize?key=" + CLOUD_TTS_KEY,
+        data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    d = json.loads(urllib.request.urlopen(req, timeout=45).read())
+    open(out, "wb").write(base64.b64decode(d["audioContent"]))
+    return True
+
+
+def tts_gemini(txt, out):
+    """Gemini TTS -> PCM 24kHz -> MP3 (ffmpeg). Trazi GEMINI_TTS_KEY."""
+    if not GEMINI_TTS_KEY:
+        raise RuntimeError("nema GEMINI_TTS_KEY")
+    import urllib.request, wave, subprocess
+    voice = os.environ.get("GEMINI_TTS_VOICE", "Charon")
+    body = {"contents": [{"parts": [{"text": "Reci na bosanskom jeziku, mirno i jasno: " + txt}]}],
+            "generationConfig": {"responseModalities": ["AUDIO"],
+                                 "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}}}
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_TTS_MODEL}:generateContent?key={GEMINI_TTS_KEY}"
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    d = json.loads(urllib.request.urlopen(req, timeout=60).read())
+    pcm = base64.b64decode(d["candidates"][0]["content"]["parts"][0]["inlineData"]["data"])
+    wav = out + ".wav"
+    w = wave.open(wav, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000); w.writeframes(pcm); w.close()
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav, "-b:a", "96k", out], check=True)
+    try: os.remove(wav)
+    except Exception: pass
+    return True
+
+
+def tts_edge(txt, out):
+    """edge-tts (besplatno, bez kljuca)."""
+    import asyncio, edge_tts
+    asyncio.run(edge_tts.Communicate(txt, EDGE_VOICE).save(out))
+    return True
+
+
+def tts_synth(txt, out, engine=None):
+    eng = (engine or TTS_ENGINE or "auto").lower()
+    order = {"cloud": ["cloud", "gemini", "edge"], "gemini": ["gemini", "cloud", "edge"],
+             "edge": ["edge"]}.get(eng, ["cloud", "gemini", "edge"])
+    fn = {"cloud": tts_cloud, "gemini": tts_gemini, "edge": tts_edge}
+    last = None
+    for name in order:
+        try:
+            tmp = out + ".part"
+            if fn[name](txt, tmp):
+                os.replace(tmp, out)
+                return name
+        except Exception as e:
+            last = f"{name}: {e}"
+            try: os.remove(out + ".part")
+            except Exception: pass
+    raise RuntimeError("nijedan TTS motor nije uspio — " + str(last))
+
+
 HERE   = os.path.dirname(os.path.abspath(__file__))
 DB     = os.path.join(HERE, "hifz.db")
 MODELS = os.path.join(HERE, "data", "models")
@@ -1520,13 +1595,9 @@ class H(BaseHTTPRequestHandler):
         if not txt:
             return self._send(404, {"error": "nema prijevoda"})
         out = os.path.join(HERE, "data", f"tts_sura_{sura}.mp3")
-        if not os.path.exists(out):
+        if not os.path.exists(out) or os.path.getsize(out) < 512:
             try:
-                import asyncio, edge_tts
-                async def g():
-                    c = edge_tts.Communicate(txt, "bs-BA-GoranNeural")
-                    await c.save(out)
-                asyncio.run(g())
+                tts_synth(txt, out)
             except Exception as e:
                 return self._send(500, {"error": f"tts: {e}"})
         with open(out, "rb") as fh:
@@ -1540,13 +1611,9 @@ class H(BaseHTTPRequestHandler):
             return self._send(404, {"error": "nema prijevoda"})
         txt = korekt_bs(rows[0]["tekst_bs"])
         out = os.path.join(HERE, "data", f"tts_{sura}_{ajet}.mp3")
-        if not os.path.exists(out):
+        if not os.path.exists(out) or os.path.getsize(out) < 512:
             try:
-                import asyncio, edge_tts
-                async def g():
-                    c = edge_tts.Communicate(txt, "bs-BA-GoranNeural")
-                    await c.save(out)
-                asyncio.run(g())
+                tts_synth(txt, out)
             except Exception as e:
                 return self._send(500, {"error": f"tts: {e}"})
         with open(out, "rb") as fh:

@@ -11,7 +11,7 @@ Primjeri:
   python3 tools/prefetch_media.py --reciters alafasy,husary --tts --workers 6
   python3 tools/prefetch_media.py --tts --limit 100          # proba na 100 ajeta
 """
-import argparse, asyncio, os, sqlite3, sys, time, urllib.request
+import argparse, os, sqlite3, sys, time, urllib.request
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(HERE, "hifz.db")
@@ -63,34 +63,36 @@ def do_audio(reciters, items, workers):
     print(f"AUDIO gotovo: {len(jobs)} zadataka, novih {ok}", flush=True)
 
 
-async def do_tts(items, concurrency=4):
-    import edge_tts
-    sem = asyncio.Semaphore(concurrency)
-    done = [0]; ok = [0]
-    async def one(it):
+def do_tts(items, engine="auto", workers=4):
+    """Bosanski TTS za sve ajete preko app.tts_synth (cloud -> gemini -> edge)."""
+    sys.path.insert(0, HERE)
+    import app as hifz_app                      # tts_synth + motori
+    from concurrent.futures import ThreadPoolExecutor
+    done = [0]; ok = [0]; err = [0]
+    def one(it):
         out = os.path.join(HERE, "data", f"tts_{it['sura']}_{it['ajet']}.mp3")
         if os.path.exists(out) and os.path.getsize(out) > 512:
             done[0] += 1; return
         txt = it.get("tekst_bs")
-        if not txt:
-            done[0] += 1; return
-        async with sem:
-            for attempt in range(3):
-                try:
-                    await edge_tts.Communicate(txt, VOICE).save(out)
-                    ok[0] += 1; break
-                except Exception:
-                    await asyncio.sleep(2.0 * (attempt + 1))
+        if txt:
+            try:
+                hifz_app.tts_synth(txt, out, engine)
+                ok[0] += 1
+            except Exception:
+                err[0] += 1
         done[0] += 1
-        if done[0] % 100 == 0: print(f"  tts {done[0]}/{len(items)} (novih {ok[0]})", flush=True)
-    await asyncio.gather(*(one(it) for it in items))
-    print(f"TTS gotovo: {len(items)} ajeta, novih {ok[0]}", flush=True)
+        if done[0] % 100 == 0:
+            print(f"  tts {done[0]}/{len(items)} (novih {ok[0]}, err {err[0]})", flush=True)
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        list(ex.map(one, items))
+    print(f"TTS gotovo: {len(items)} ajeta, novih {ok[0]}, greske {err[0]}", flush=True)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--reciters", default="alafasy,husary")
     ap.add_argument("--tts", action="store_true")
+    ap.add_argument("--tts-engine", default="auto", choices=["auto","cloud","gemini","edge"])
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
@@ -101,7 +103,7 @@ def main():
     t0 = time.time()
     rec = [x.strip() for x in a.reciters.split(",") if x.strip()]
     if rec: do_audio(rec, items, a.workers)
-    if a.tts: asyncio.run(do_tts(items))
+    if a.tts: do_tts(items, a.tts_engine)
     print(f"UKUPNO {time.time()-t0:.0f}s", flush=True)
 
 

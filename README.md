@@ -5,7 +5,8 @@ serveru ili računaru, **bez plaćenih servisa i bez API ključeva**.
 
 - 📖 **114 sura / 6236 ajeta** — arapski (Uthmani), prijevod na **bosanskom** i engleskom
 - 🎧 **Audio** (Alafasy, Husary) — javni izvori (everyayah.com)
-- 🗣️ **TTS na bosanskom** — `edge-tts` (besplatno)
+- 🗣️ **TTS na bosanskom** — 3 motora sa automatskim fallbackom:
+  **Google Cloud TTS** (Chirp3-HD, najprirodniji) → **Gemini TTS** → `edge-tts` (potpuno besplatno)
 - 🎙️ **ASR provjera učenja** — `faster-whisper` (lokalno, CPU, int8, bez interneta)
 - 🤖 **Opciono: „savjet“** — kratak savjet preko **bilo kog OpenAI-kompatibilnog endpointa**
   (npr. Ollama/vLLM lokalno, ili neki besplatni endpoint) — `HIFZ_MOTOR_URL`
@@ -19,6 +20,9 @@ python3 -m pip install -r requirements.txt
 
 python3 tools/build_db.py            # gradi hifz.db iz javnih izvora (bez ključeva)
 bash tools/install_model.sh          # skida besplatni ASR model (Arabic, int8)
+
+# (opciono) sve snimi lokalno -> posle radi 100% offline i trenutno:
+python3 tools/prefetch_media.py --reciters alafasy,husary --tts --tts-engine auto --workers 6
 
 python3 app.py                       # -> http://127.0.0.1:8085
 ```
@@ -52,6 +56,11 @@ sudo systemctl enable --now gama-hifz
 |---|---|---|
 | `HIFZ_PORT` | `8085` | port |
 | `HIFZ_MOTOR_URL` | *(prazno)* | OpenAI-kompatibilan `/v1/chat/completions` za „savjet“ |
+| `HIFZ_TTS_ENGINE` | `auto` | `auto` / `cloud` / `gemini` / `edge` |
+| `CLOUD_TTS_KEY` | *(prazno)* | Google Cloud TTS ključ (GCP, `texttospeech`) — **najprirodniji glas** |
+| `CLOUD_TTS_VOICE` | `hr-HR-Chirp3-HD-Charon` | Cloud glas (bs-BA ne postoji; hr-HR ≈ bosanski) |
+| `GEMINI_TTS_KEY` | *(prazno)* | Gemini TTS ključ (govori bosanski nativno) |
+| `HIFZ_TTS_VOICE` | `bs-BA-GoranNeural` | edge-tts glas (besplatno) |
 
 ## Zahtjevi
 
