@@ -13,7 +13,9 @@ Primjeri:
 """
 import argparse, os, sqlite3, sys, time, urllib.request
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SD = os.path.dirname(os.path.abspath(__file__))
+# radi i ako je skripta u tools/ i ako je u korijenu repoa
+HERE = _SD if os.path.exists(os.path.join(_SD, "hifz.db")) else os.path.dirname(_SD)
 DB = os.path.join(HERE, "hifz.db")
 CACHE = os.path.join(HERE, "data", "audio_cache")
 VOICE = os.environ.get("HIFZ_TTS_VOICE", "bs-BA-GoranNeural")
