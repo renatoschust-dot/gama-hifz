@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+hifz.db
+data/models/
+data/audio_cache/
+data/*.mp3
+data/samples/
+*.bak_*

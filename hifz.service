@@ -1,0 +1,17 @@
+[Unit]
+Description=GAMA HIFZ - server za ucenje Kur'ana
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/gama-hifz
+Environment=HIFZ_PORT=8085
+# Opciono: OpenAI-kompatibilan endpoint za "savjet" (Ollama/vLLM/bilo koji free)
+# Environment=HIFZ_MOTOR_URL=http://127.0.0.1:11434/v1
+ExecStart=/usr/bin/python3 /opt/gama-hifz/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
