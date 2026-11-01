@@ -230,7 +230,7 @@ def get_model():
 STT_URL = os.environ.get("GAMA_STT_URL", "http://127.0.0.1:8077")
 
 def transcribe_gpu(path):
-    """Arapski preko GAMA GPU whisper (Vast :8077, large-v3-turbo)."""
+    """Arapski preko GAMA GPU whisper (GPU :8077, large-v3-turbo)."""
     import urllib.request
     with open(path, "rb") as f:
         data = f.read()
@@ -242,7 +242,7 @@ def transcribe_gpu(path):
 
 def transcribe(path):
     """Arapski: prvo GAMA GPU (brzo + tacno), pa lokalni CPU fallback."""
-    # 1) GAMA GPU (Vast large-v3-turbo)
+    # 1) GAMA GPU (GPU large-v3-turbo)
     if STT_URL:
         try:
             txt = transcribe_gpu(path)
