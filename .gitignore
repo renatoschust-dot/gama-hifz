@@ -6,3 +6,13 @@ data/audio_cache/
 data/*.mp3
 data/samples/
 *.bak_*
+
+# gama-secrets-guard
+.env
+*.token
+*.key
+*.pem
+tenants.json
+.git-credentials
+__pycache__/
+*.pyc
