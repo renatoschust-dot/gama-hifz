@@ -93,7 +93,13 @@ PORT   = int(os.environ.get("HIFZ_PORT", "8085"))
 # ---------------------------------------------------------------- arapski
 AR_DIACRITICS = re.compile(r"[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u08D3-\u08FF]")
 AR_TATWEEL    = re.compile(r"\u0640")
-AR_PUNCT      = re.compile(r"[^\w\s\u0600-\u06FF]", re.UNICODE)
+# Arabic punctuation lives *inside* the Arabic block, so the "keep the block" rule
+# above used to keep it: a verse ending in a comma never matched the same verse
+# without one. Strip the punctuation explicitly before anything else.
+AR_PUNCT      = re.compile(
+    r"[^\w\s\u0600-\u06FF]"
+    r"|[\u060C\u061B\u061F\u066A-\u066D\u06D4\u06DD\u06DE\u06E9\uFD3E\uFD3F]",
+    re.UNICODE)
 
 def norm_ar(s: str) -> str:
     """Normalizacija arapskog za poredjenje: skini dijakritiku, alef varijante, tatweel."""

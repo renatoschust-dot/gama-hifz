@@ -15,7 +15,7 @@ serveru ili računaru, **bez plaćenih servisa i bez API ključeva**.
 ## Brzo pokretanje (Linux)
 
 ```bash
-git clone https://github.com/<org>/gama-hifz && cd gama-hifz
+git clone https://github.com/renatoschust-dot/gama-hifz && cd gama-hifz
 python3 -m pip install -r requirements.txt
 
 python3 tools/build_db.py            # gradi hifz.db iz javnih izvora (bez ključeva)
