@@ -1,4 +1,4 @@
 # GAMA HIFZ — minimalne zavisnosti (sve besplatno, radi offline)
 # Server sam po sebi koristi SAMO Python standardnu biblioteku.
-faster-whisper>=1.0.0     # ASR (provjera ucenja, lokalno, CPU int8)
+faster-whisper>=1.2.1     # ASR (provjera ucenja, lokalno, CPU int8)
 edge-tts>=6.1.0           # TTS na bosanskom (besplatno, Microsoft Edge glasovi)
